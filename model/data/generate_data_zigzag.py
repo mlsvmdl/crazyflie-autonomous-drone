@@ -1,22 +1,11 @@
-"""
-OPTIMIZED SYNTHETIC TRAINING DATA GENERATOR FOR DRONE
-- Tight space navigation (works down to 150-200mm clearance)
-- Dead-ends yaw (180° turn) by default; UP only when top/bottom approaching
-- Guarantees ALL 9 actions
-- Aggressive thresholds for close-quarters maneuvering
-"""
-
 import numpy as np
 import pandas as pd
 import random
-from datetime import datetime
 
-# Reproducibility
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 random.seed(RANDOM_SEED)
 
-# Action mapping
 ACTION_MAP = {
     0: "hover",
     1: "forward",
@@ -29,29 +18,23 @@ ACTION_MAP = {
     8: "down",
 }
 
-# Configuration
 NUM_SAMPLES = 50000
 
 MIN_DIST = 100.0
 MAX_DIST = 2000.0
-MIN_ALT = 0.1
-MAX_ALT = 2.5
-TARGET_ALT = 0.5
-ALT_TOLERANCE = 0.15
 
-# TIGHT SPACE THRESHOLDS - optimized for 150-200mm navigation
-OBSTACLE_CRITICAL = 120.0  # Extreme danger - will touch wall
-OBSTACLE_NEAR = 200.0  # Very close - must react immediately
-OBSTACLE_CLOSE = 350.0  # Close - prepare to react
-SAFE_DISTANCE = 600.0  # Safe to go forward aggressively
+OBSTACLE_CRITICAL = 120.0
+OBSTACLE_NEAR = 200.0
+OBSTACLE_CLOSE = 400.0
+SAFE_DISTANCE = 600.0
 
-# Altitude margins for "approaching" top/bottom
-ALT_UP_MARGIN = 0.3  # Used to define "top approaching"
-TOP_APPROACHING = MAX_ALT - ALT_UP_MARGIN
-BOTTOM_APPROACHING = MIN_ALT + ALT_UP_MARGIN
+VERTICAL_CRITICAL_DOWN = 50.0
+VERTICAL_NEAR_DOWN = 150.0
+VERTICAL_SAFE_DOWN = 300.0
 
-
-# ------------- State classification helpers ------------- #
+VERTICAL_CRITICAL_UP = 100.0
+VERTICAL_NEAR_UP = 200.0
+VERTICAL_SAFE_UP = 400.0
 
 
 def front_state(d):
@@ -59,8 +42,10 @@ def front_state(d):
         return "critical"
     elif d < OBSTACLE_NEAR:
         return "near"
-    elif d < SAFE_DISTANCE:
+    elif d < OBSTACLE_CLOSE:
         return "close"
+    elif d < SAFE_DISTANCE:
+        return "approaching"
     else:
         return "clear"
 
@@ -70,157 +55,110 @@ def side_state(d):
         return "critical"
     elif d < OBSTACLE_NEAR:
         return "near"
-    elif d < OBSTACLE_CLOSE:
-        return "close"
     else:
-        return "clear"
+        return "safe"
 
 
-def altitude_state(alt):
-    """
-    Altitude logic:
-    - too_low  => bottom approaching: allow UP
-    - too_high => top approaching: allow DOWN, and dead-ends may use UP to escape if needed
-    - ok       => no vertical movement preferred
-    """
-    if alt < BOTTOM_APPROACHING:
-        return "too_low"
-    elif alt > TOP_APPROACHING:
-        return "too_high"
+def vertical_down_state(d):
+    if d < VERTICAL_CRITICAL_DOWN:
+        return "critical"
+    elif d < VERTICAL_NEAR_DOWN:
+        return "near"
+    elif d < VERTICAL_SAFE_DOWN:
+        return "approaching"
     else:
-        return "ok"
+        return "safe"
 
 
-# ------------- OPTIMIZED EXPERT POLICY FOR TIGHT SPACES ------------- #
+def vertical_up_state(d):
+    if d < VERTICAL_CRITICAL_UP:
+        return "critical"
+    elif d < VERTICAL_NEAR_UP:
+        return "near"
+    elif d < VERTICAL_SAFE_UP:
+        return "approaching"
+    else:
+        return "safe"
 
 
-def apply_expert_rules(dist_front, dist_back, dist_left, dist_right, altitude):
-    """
-    Optimized expert system for tight space navigation.
+def apply_expert_rules(
+    dist_front, dist_back, dist_left, dist_right, dist_down, dist_up
+):
+    down_state = vertical_down_state(dist_down)
+    up_state = vertical_up_state(dist_up)
 
-    Key behaviors:
-    - Tolerates closer approaches (down to 150-200mm)
-    - Dead-ends YAW by default (180° turn), not UP
-    - UP/DOWN only when top/bottom is approaching
-    - Backward is extremely rare (only if can't yaw and can't safely stay)
-    - Aggressive forward preference in corridors
-    """
+    if down_state == "critical":
+        return 7
+    if up_state == "critical":
+        return 8
 
-    # ---- Priority 1: ALTITUDE SAFETY (top/bottom approaching) ----
-    alt_state = altitude_state(altitude)
-    if alt_state == "too_low":
-        # Bottom approaching: go UP
-        return 7  # UP
-    if alt_state == "too_high":
-        # Top approaching: go DOWN
-        return 8  # DOWN
+    if down_state == "near" and up_state in ["safe", "approaching"]:
+        return 7
+    if up_state == "near" and down_state in ["safe", "approaching"]:
+        return 8
 
-    # ---- Classify all distances ----
     f_state = front_state(dist_front)
     l_state = side_state(dist_left)
     r_state = side_state(dist_right)
 
-    # ---- Priority 2: CRITICAL SIDE WALL (about to touch) ----
-    if dist_left < OBSTACLE_CRITICAL and dist_right > OBSTACLE_NEAR:
-        return 4  # RIGHT - emergency
-    if dist_right < OBSTACLE_CRITICAL and dist_left > OBSTACLE_NEAR:
-        return 3  # LEFT - emergency
+    if l_state == "critical" and dist_right > OBSTACLE_CRITICAL + 50:
+        return 4
+    if r_state == "critical" and dist_left > OBSTACLE_CRITICAL + 50:
+        return 3
 
-    # ---- Priority 3: DEAD-END - DEFAULT IS YAW, not UP ----
-    # Dead-end = front blocked AND both sides blocked
     dead_end = (
         f_state in ("critical", "near")
-        and l_state in ("critical", "near")
-        and r_state in ("critical", "near")
+        and l_state == "critical"
+        and r_state == "critical"
     )
-
     if dead_end:
-        # Default behavior: always yaw to turn around
-        # Only use UP here if explicitly desired when already high and no other good option.
-        # Since altitude_state already handled true top/bottom danger, keep this purely yaw.
-        return 5  # YAW_LEFT (start 180° turn)
+        return 5
 
-    # ---- Priority 4: FRONT CRITICAL (about to hit) ----
     if f_state == "critical":
-        # Immediate obstacle - must yaw or move sideways NOW
-        left_clear = l_state in ("clear", "close")
-        right_clear = r_state in ("clear", "close")
-
-        if left_clear and not right_clear:
-            return 5  # YAW_LEFT
-        elif right_clear and not left_clear:
-            return 6  # YAW_RIGHT
-        elif left_clear and right_clear:
-            # Both sides have room - pick side with MORE space
+        if l_state != "critical" and r_state == "critical":
+            return 5
+        elif r_state != "critical" and l_state == "critical":
+            return 6
+        elif l_state != "critical" and r_state != "critical":
             return 5 if dist_left > dist_right else 6
         else:
-            # Both sides blocked but not dead-end (back must be clear)
-            # This is the ONLY case for backward
             if dist_back > OBSTACLE_NEAR:
-                return 2  # BACKWARD (rare case)
+                return 2
             else:
-                # Truly stuck - yaw anyway
-                return 5  # YAW_LEFT
+                return 5
 
-    # ---- Priority 5: FRONT NEAR (very close) ----
     if f_state == "near":
-        left_better = l_state in ("clear", "close")
-        right_better = r_state in ("clear", "close")
-
-        if left_better and not right_better:
-            return 5  # YAW_LEFT
-        elif right_better and not left_better:
-            return 6  # YAW_RIGHT
-        elif left_better and right_better:
-            # Both okay - compare distances
-            return 5 if dist_left > dist_right else 6
+        if l_state == "near" and r_state == "near":
+            return 1
+        if l_state != "critical" and r_state == "critical":
+            return 5
+        elif r_state != "critical" and l_state == "critical":
+            return 6
         else:
-            # Both sides near - yaw toward better side
             return 5 if dist_left > dist_right else 6
 
-    # ---- Priority 6: FRONT CLOSE (approaching) ----
     if f_state == "close":
-        # Only yaw if there's a BIG side advantage
         side_diff = abs(dist_left - dist_right)
-        BIG_SIDE_ADVANTAGE = 250.0  # Reduced for tighter spaces
-
-        if side_diff > BIG_SIDE_ADVANTAGE:
-            # Clear advantage - gentle yaw
+        if side_diff > 200.0:
             return 5 if dist_left > dist_right else 6
         else:
-            # Sides similar - keep going forward
-            return 1  # FORWARD
+            return 1
 
-    # ---- Priority 7: SIDE WALL PROXIMITY (corridor centering) ----
+    if f_state == "approaching":
+        side_diff = abs(dist_left - dist_right)
+        if side_diff > 300.0:
+            return 5 if dist_left > dist_right else 6
+        else:
+            return 1
+
     if f_state == "clear":
-        # Near left wall - move right
-        if l_state in ("critical", "near") and r_state in ("clear", "close"):
-            return 4  # RIGHT
+        if l_state == "critical":
+            return 4
+        if r_state == "critical":
+            return 3
+        return 1
 
-        # Near right wall - move left
-        if r_state in ("critical", "near") and l_state in ("clear", "close"):
-            return 3  # LEFT
-
-        # Close to left wall - gentle correction
-        if l_state == "close" and r_state == "clear":
-            return 4  # RIGHT
-
-        # Close to right wall - gentle correction
-        if r_state == "close" and l_state == "clear":
-            return 3  # LEFT
-
-        # Narrow corridor (both sides close) - go forward centered
-        if l_state == "close" and r_state == "close":
-            return 1  # FORWARD
-
-        # Everything clear - go forward
-        return 1  # FORWARD
-
-    # ---- Priority 8: DEFAULT - FORWARD ----
-    return 1  # FORWARD
-
-
-# ------------- Scenario generation ------------- #
+    return 1
 
 
 def sample_in_range(lo, hi):
@@ -228,234 +166,313 @@ def sample_in_range(lo, hi):
 
 
 def generate_scenario(scenario_type):
-    """Generate scenarios optimized for tight space training."""
+    if scenario_type == "ground_critical":
+        return {
+            "dist_front": sample_in_range(SAFE_DISTANCE, MAX_DIST),
+            "dist_back": sample_in_range(SAFE_DISTANCE, MAX_DIST),
+            "dist_left": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_right": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_down": sample_in_range(10, VERTICAL_CRITICAL_DOWN),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
+        }
 
-    if scenario_type == "open_space":
+    elif scenario_type == "ceiling_critical":
+        return {
+            "dist_front": sample_in_range(SAFE_DISTANCE, MAX_DIST),
+            "dist_back": sample_in_range(SAFE_DISTANCE, MAX_DIST),
+            "dist_left": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_right": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, MAX_DIST),
+            "dist_up": sample_in_range(30, VERTICAL_CRITICAL_UP),
+        }
+
+    elif scenario_type == "ground_near":
+        return {
+            "dist_front": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_left": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_right": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_down": sample_in_range(
+                VERTICAL_CRITICAL_DOWN + 5, VERTICAL_NEAR_DOWN
+            ),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
+        }
+
+    elif scenario_type == "ceiling_near":
+        return {
+            "dist_front": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_left": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_right": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, MAX_DIST),
+            "dist_up": sample_in_range(VERTICAL_CRITICAL_UP + 5, VERTICAL_NEAR_UP),
+        }
+
+    elif scenario_type == "vertical_squeeze":
+        return {
+            "dist_front": sample_in_range(SAFE_DISTANCE, MAX_DIST),
+            "dist_back": sample_in_range(SAFE_DISTANCE, MAX_DIST),
+            "dist_left": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_right": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_down": sample_in_range(VERTICAL_NEAR_DOWN, VERTICAL_SAFE_DOWN),
+            "dist_up": sample_in_range(VERTICAL_CRITICAL_UP + 10, VERTICAL_NEAR_UP),
+        }
+
+    elif scenario_type == "ground_with_front_obstacle":
+        return {
+            "dist_front": sample_in_range(OBSTACLE_CRITICAL, OBSTACLE_NEAR),
+            "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_left": sample_in_range(OBSTACLE_NEAR, SAFE_DISTANCE),
+            "dist_right": sample_in_range(OBSTACLE_NEAR, SAFE_DISTANCE),
+            "dist_down": sample_in_range(VERTICAL_CRITICAL_DOWN, VERTICAL_NEAR_DOWN),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
+        }
+
+    elif scenario_type == "ceiling_with_front_obstacle":
+        return {
+            "dist_front": sample_in_range(OBSTACLE_CRITICAL, OBSTACLE_NEAR),
+            "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_left": sample_in_range(OBSTACLE_NEAR, SAFE_DISTANCE),
+            "dist_right": sample_in_range(OBSTACLE_NEAR, SAFE_DISTANCE),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, MAX_DIST),
+            "dist_up": sample_in_range(VERTICAL_CRITICAL_UP, VERTICAL_NEAR_UP),
+        }
+
+    elif scenario_type == "open_space":
         return {
             "dist_front": sample_in_range(SAFE_DISTANCE, MAX_DIST),
             "dist_back": sample_in_range(SAFE_DISTANCE, MAX_DIST),
             "dist_left": sample_in_range(SAFE_DISTANCE, MAX_DIST),
             "dist_right": sample_in_range(SAFE_DISTANCE, MAX_DIST),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_down": sample_in_range(400, 600),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
     elif scenario_type == "tight_corridor":
-        # Narrow corridor - both sides close, front clear
         return {
             "dist_front": sample_in_range(SAFE_DISTANCE, MAX_DIST),
             "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(OBSTACLE_NEAR, OBSTACLE_CLOSE),
-            "dist_right": sample_in_range(OBSTACLE_NEAR, OBSTACLE_CLOSE),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_left": sample_in_range(150, OBSTACLE_NEAR + 20),
+            "dist_right": sample_in_range(150, OBSTACLE_NEAR + 20),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
     elif scenario_type == "very_tight_corridor":
-        # Very tight corridor - testing limits
         return {
             "dist_front": sample_in_range(SAFE_DISTANCE, MAX_DIST),
             "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(150, OBSTACLE_NEAR + 50),
-            "dist_right": sample_in_range(150, OBSTACLE_NEAR + 50),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_left": sample_in_range(130, 180),
+            "dist_right": sample_in_range(130, 180),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
     elif scenario_type == "left_wall_critical":
-        # About to touch left wall
         return {
             "dist_front": sample_in_range(SAFE_DISTANCE, MAX_DIST),
             "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
             "dist_left": sample_in_range(MIN_DIST, OBSTACLE_CRITICAL),
-            "dist_right": sample_in_range(SAFE_DISTANCE, MAX_DIST),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_right": sample_in_range(OBSTACLE_CRITICAL + 100, MAX_DIST),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
     elif scenario_type == "right_wall_critical":
         return {
             "dist_front": sample_in_range(SAFE_DISTANCE, MAX_DIST),
             "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(SAFE_DISTANCE, MAX_DIST),
+            "dist_left": sample_in_range(OBSTACLE_CRITICAL + 100, MAX_DIST),
             "dist_right": sample_in_range(MIN_DIST, OBSTACLE_CRITICAL),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
-    elif scenario_type == "left_wall_near":
+    elif scenario_type == "left_wall_near_comfortable":
         return {
             "dist_front": sample_in_range(SAFE_DISTANCE, MAX_DIST),
             "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(OBSTACLE_CRITICAL, OBSTACLE_NEAR + 50),
+            "dist_left": sample_in_range(150, 180),
             "dist_right": sample_in_range(SAFE_DISTANCE, MAX_DIST),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
-    elif scenario_type == "right_wall_near":
+    elif scenario_type == "right_wall_near_comfortable":
         return {
             "dist_front": sample_in_range(SAFE_DISTANCE, MAX_DIST),
             "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
             "dist_left": sample_in_range(SAFE_DISTANCE, MAX_DIST),
-            "dist_right": sample_in_range(OBSTACLE_CRITICAL, OBSTACLE_NEAR + 50),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_right": sample_in_range(150, 180),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
     elif scenario_type == "front_critical_left_clear":
-        # About to hit wall, left side open - yaw left
         return {
             "dist_front": sample_in_range(MIN_DIST, OBSTACLE_CRITICAL),
             "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(SAFE_DISTANCE, MAX_DIST),
-            "dist_right": sample_in_range(OBSTACLE_NEAR, OBSTACLE_CLOSE),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_left": sample_in_range(OBSTACLE_NEAR, MAX_DIST),
+            "dist_right": sample_in_range(OBSTACLE_CRITICAL, OBSTACLE_NEAR),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
     elif scenario_type == "front_critical_right_clear":
         return {
             "dist_front": sample_in_range(MIN_DIST, OBSTACLE_CRITICAL),
             "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(OBSTACLE_NEAR, OBSTACLE_CLOSE),
+            "dist_left": sample_in_range(OBSTACLE_CRITICAL, OBSTACLE_NEAR),
+            "dist_right": sample_in_range(OBSTACLE_NEAR, MAX_DIST),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
+        }
+
+    elif scenario_type == "front_near_corridor":
+        return {
+            "dist_front": sample_in_range(OBSTACLE_CRITICAL + 10, OBSTACLE_NEAR),
+            "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_left": sample_in_range(150, 200),
+            "dist_right": sample_in_range(150, 200),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
+        }
+
+    elif scenario_type == "front_near_open_sides":
+        return {
+            "dist_front": sample_in_range(OBSTACLE_CRITICAL + 10, OBSTACLE_NEAR),
+            "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
+            "dist_left": sample_in_range(SAFE_DISTANCE, MAX_DIST),
             "dist_right": sample_in_range(SAFE_DISTANCE, MAX_DIST),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
-        }
-
-    elif scenario_type == "front_near_left_better":
-        return {
-            "dist_front": sample_in_range(OBSTACLE_CRITICAL, OBSTACLE_NEAR + 50),
-            "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_right": sample_in_range(OBSTACLE_NEAR, OBSTACLE_CLOSE),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
-        }
-
-    elif scenario_type == "front_near_right_better":
-        return {
-            "dist_front": sample_in_range(OBSTACLE_CRITICAL, OBSTACLE_NEAR + 50),
-            "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(OBSTACLE_NEAR, OBSTACLE_CLOSE),
-            "dist_right": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
     elif scenario_type == "front_close_balanced":
-        # Front getting close but sides balanced - keep forward
         return {
-            "dist_front": sample_in_range(OBSTACLE_CLOSE, SAFE_DISTANCE),
+            "dist_front": sample_in_range(OBSTACLE_NEAR + 50, OBSTACLE_CLOSE),
             "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(SAFE_DISTANCE - 100, MAX_DIST),
-            "dist_right": sample_in_range(SAFE_DISTANCE - 100, MAX_DIST),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_left": sample_in_range(OBSTACLE_CLOSE - 50, OBSTACLE_CLOSE + 50),
+            "dist_right": sample_in_range(OBSTACLE_CLOSE - 50, OBSTACLE_CLOSE + 50),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
-    elif scenario_type == "dead_end_yaw":
-        # Dead-end at normal altitude - should YAW (not UP)
+    elif scenario_type == "dead_end":
         return {
             "dist_front": sample_in_range(MIN_DIST, OBSTACLE_NEAR),
             "dist_back": sample_in_range(OBSTACLE_NEAR, OBSTACLE_CLOSE),
-            "dist_left": sample_in_range(MIN_DIST, OBSTACLE_NEAR),
-            "dist_right": sample_in_range(MIN_DIST, OBSTACLE_NEAR),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_left": sample_in_range(MIN_DIST, OBSTACLE_CRITICAL),
+            "dist_right": sample_in_range(MIN_DIST, OBSTACLE_CRITICAL),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
     elif scenario_type == "force_backward":
-        # Rare case: front critical, sides blocked, back clear - BACKWARD
         return {
             "dist_front": sample_in_range(MIN_DIST, OBSTACLE_CRITICAL),
             "dist_back": sample_in_range(SAFE_DISTANCE, MAX_DIST),
-            "dist_left": sample_in_range(OBSTACLE_CRITICAL, OBSTACLE_NEAR),
-            "dist_right": sample_in_range(OBSTACLE_CRITICAL, OBSTACLE_NEAR),
-            "altitude": sample_in_range(TARGET_ALT - 0.1, TARGET_ALT + 0.1),
+            "dist_left": sample_in_range(MIN_DIST, OBSTACLE_CRITICAL),
+            "dist_right": sample_in_range(MIN_DIST, OBSTACLE_CRITICAL),
+            "dist_down": sample_in_range(VERTICAL_SAFE_DOWN, 700),
+            "dist_up": sample_in_range(VERTICAL_SAFE_UP, MAX_DIST),
         }
 
-    elif scenario_type == "too_low":
-        # Bottom approaching
-        return {
-            "dist_front": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_right": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "altitude": sample_in_range(MIN_ALT, BOTTOM_APPROACHING - 0.02),
-        }
-
-    elif scenario_type == "too_high":
-        # Top approaching
-        return {
-            "dist_front": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_back": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_left": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "dist_right": sample_in_range(OBSTACLE_CLOSE, MAX_DIST),
-            "altitude": sample_in_range(TOP_APPROACHING + 0.02, MAX_ALT),
-        }
-
-    elif scenario_type == "force_hover":
-        return {
-            "dist_front": sample_in_range(OBSTACLE_NEAR + 20, OBSTACLE_CLOSE),
-            "dist_back": sample_in_range(OBSTACLE_NEAR + 20, OBSTACLE_CLOSE),
-            "dist_left": sample_in_range(OBSTACLE_NEAR + 20, OBSTACLE_CLOSE),
-            "dist_right": sample_in_range(OBSTACLE_NEAR + 20, OBSTACLE_CLOSE),
-            "altitude": sample_in_range(TARGET_ALT - 0.05, TARGET_ALT + 0.05),
-        }
-
-    else:  # "random"
+    else:
         return {
             "dist_front": sample_in_range(MIN_DIST, MAX_DIST),
             "dist_back": sample_in_range(MIN_DIST, MAX_DIST),
             "dist_left": sample_in_range(MIN_DIST, MAX_DIST),
             "dist_right": sample_in_range(MIN_DIST, MAX_DIST),
-            "altitude": sample_in_range(MIN_ALT, MAX_ALT),
+            "dist_down": sample_in_range(100, MAX_DIST),
+            "dist_up": sample_in_range(150, MAX_DIST),
         }
 
 
-def generate_synthetic_data(num_samples):
+def validate_vertical_navigation(df):
     print("\n" + "=" * 70)
-    print("  TIGHT SPACE OPTIMIZED DRONE TRAINING DATA GENERATOR")
-    print("=" * 70)
-    print(
-        f"  Thresholds: CRITICAL={OBSTACLE_CRITICAL} NEAR={OBSTACLE_NEAR} "
-        f"CLOSE={OBSTACLE_CLOSE} SAFE={SAFE_DISTANCE}"
-    )
+    print("VERTICAL NAVIGATION VALIDATION")
     print("=" * 70)
 
-    # Heavy emphasis on tight space scenarios
+    ground_critical = df[df["dist_down"] < VERTICAL_CRITICAL_DOWN]
+    if len(ground_critical) > 0:
+        up_pct = (ground_critical["action"] == 7).mean() * 100.0
+        print(f"Ground critical → UP: {up_pct:.1f}% (n={len(ground_critical)})")
+
+    ceiling_critical = df[df["dist_up"] < VERTICAL_CRITICAL_UP]
+    if len(ceiling_critical) > 0:
+        down_pct = (ceiling_critical["action"] == 8).mean() * 100.0
+        print(f"Ceiling critical → DOWN: {down_pct:.1f}% (n={len(ceiling_critical)})")
+
+    ground_near = df[
+        df["dist_down"].between(VERTICAL_CRITICAL_DOWN, VERTICAL_NEAR_DOWN)
+        & (df["dist_up"] > VERTICAL_SAFE_UP)
+    ]
+    if len(ground_near) > 0:
+        up_pct = (ground_near["action"] == 7).mean() * 100.0
+        print(f"Ground near → UP: {up_pct:.1f}% (n={len(ground_near)})")
+
+    print("=" * 70)
+
+
+def validate_tight_space_navigation(df):
+    print("\n" + "=" * 70)
+    print("TIGHT SPACE VALIDATION")
+    print("=" * 70)
+
+    tight_corridor = df[
+        (df["dist_front"] > SAFE_DISTANCE)
+        & df["dist_left"].between(150, 200)
+        & df["dist_right"].between(150, 200)
+    ]
+
+    if len(tight_corridor) > 0:
+        forward_pct = (tight_corridor["action"] == 1).mean() * 100.0
+        print(f"Tight corridor forward: {forward_pct:.1f}% (n={len(tight_corridor)})")
+
+    print("=" * 70)
+
+
+def generate_synthetic_data(num_samples):
+    print("\nDRONE DATA GENERATOR - 6 FEATURES WITH VERTICAL AVOIDANCE\n")
+
     scenario_types = [
-        ("open_space", 0.25),
-        ("tight_corridor", 0.20),
-        ("very_tight_corridor", 0.10),
-        ("left_wall_critical", 0.04),
-        ("right_wall_critical", 0.04),
-        ("left_wall_near", 0.05),
-        ("right_wall_near", 0.05),
-        ("front_critical_left_clear", 0.04),
-        ("front_critical_right_clear", 0.04),
-        ("front_near_left_better", 0.04),
-        ("front_near_right_better", 0.04),
-        ("front_close_balanced", 0.03),
-        ("dead_end_yaw", 0.03),
-        ("force_backward", 0.01),  # Minimal backward
-        ("too_low", 0.01),
-        ("too_high", 0.01),
-        ("force_hover", 0.00),
-        ("random", 0.00),
+        ("ground_critical", 0.05),
+        ("ceiling_critical", 0.04),
+        ("ground_near", 0.05),
+        ("ceiling_near", 0.03),
+        ("vertical_squeeze", 0.02),
+        ("ground_with_front_obstacle", 0.01),
+        ("open_space", 0.04),
+        ("tight_corridor", 0.18),
+        ("very_tight_corridor", 0.12),
+        ("left_wall_critical", 0.05),
+        ("right_wall_critical", 0.05),
+        ("left_wall_near_comfortable", 0.08),
+        ("right_wall_near_comfortable", 0.08),
+        ("front_critical_left_clear", 0.05),
+        ("front_critical_right_clear", 0.05),
+        ("front_near_corridor", 0.07),
+        ("front_near_open_sides", 0.03),
+        ("front_close_balanced", 0.02),
+        ("dead_end", 0.02),
+        ("force_backward", 0.01),
     ]
 
     data = []
     action_counts = {i: 0 for i in range(9)}
 
-    print(f"\nGenerating {num_samples:,} samples...")
-    print("Scenario distribution:")
-    for scenario, prob in scenario_types:
-        print(f"   {scenario:30s}: {prob * 100:>5.1f}%")
-
-    # Force minimum samples for each action
-    print("\n🔒 Forcing minimum samples for each action...")
-    min_per_action = 150
-
+    min_per_action = 500
     forced_scenarios = {
-        7: "too_low",
-        8: "too_high",
-        1: "open_space",
+        0: "open_space",
+        7: "ground_critical",
+        8: "ceiling_critical",
+        1: "tight_corridor",
         2: "force_backward",
         3: "right_wall_critical",
         4: "left_wall_critical",
         5: "front_critical_left_clear",
         6: "front_critical_right_clear",
-        0: "force_hover",
     }
 
     for action_id, scenario_type in forced_scenarios.items():
@@ -464,121 +481,96 @@ def generate_synthetic_data(num_samples):
         max_attempts = min_per_action * 30
 
         while generated < min_per_action and attempts < max_attempts:
-            scenario = generate_scenario(scenario_type)
-            action = apply_expert_rules(
-                scenario["dist_front"],
-                scenario["dist_back"],
-                scenario["dist_left"],
-                scenario["dist_right"],
-                scenario["altitude"],
+            s = generate_scenario(scenario_type)
+            a = apply_expert_rules(
+                s["dist_front"],
+                s["dist_back"],
+                s["dist_left"],
+                s["dist_right"],
+                s["dist_down"],
+                s["dist_up"],
             )
-
-            if action == action_id:
+            if a == action_id:
                 data.append(
                     {
-                        "dist_front": scenario["dist_front"],
-                        "dist_back": scenario["dist_back"],
-                        "dist_left": scenario["dist_left"],
-                        "dist_right": scenario["dist_right"],
-                        "altitude": scenario["altitude"],
-                        "action": action,
+                        "dist_front": s["dist_front"],
+                        "dist_back": s["dist_back"],
+                        "dist_left": s["dist_left"],
+                        "dist_right": s["dist_right"],
+                        "dist_down": s["dist_down"],
+                        "dist_up": s["dist_up"],
+                        "action": a,
                     }
                 )
-                action_counts[action] += 1
+                action_counts[a] += 1
                 generated += 1
-
             attempts += 1
 
-        print(
-            f"   Action {action_id} ({ACTION_MAP[action_id]:10s}): "
-            f"{generated:3d} samples (attempts: {attempts})"
-        )
-
         if generated < min_per_action:
-            print(
-                f"      ⚠️  Only got {generated}, forcing "
-                f"{min_per_action - generated} synthetic..."
-            )
             for _ in range(min_per_action - generated):
-                base_scenario = generate_scenario(scenario_type)
+                s = generate_scenario(scenario_type)
                 data.append(
                     {
-                        "dist_front": base_scenario["dist_front"],
-                        "dist_back": base_scenario["dist_back"],
-                        "dist_left": base_scenario["dist_left"],
-                        "dist_right": base_scenario["dist_right"],
-                        "altitude": base_scenario["altitude"],
+                        "dist_front": s["dist_front"],
+                        "dist_back": s["dist_back"],
+                        "dist_left": s["dist_left"],
+                        "dist_right": s["dist_right"],
+                        "dist_down": s["dist_down"],
+                        "dist_up": s["dist_up"],
                         "action": action_id,
                     }
                 )
                 action_counts[action_id] += 1
 
-    # Generate remaining samples
     remaining = num_samples - len(data)
-    print(f"\n📊 Generating {remaining:,} additional samples...")
+    names = [s[0] for s in scenario_types]
+    weights = [s[1] for s in scenario_types]
 
-    for i in range(remaining):
-        scenario_type = random.choices(
-            [s[0] for s in scenario_types],
-            weights=[s[1] for s in scenario_types],
-        )[0]
-
-        scenario = generate_scenario(scenario_type)
-        action = apply_expert_rules(
-            scenario["dist_front"],
-            scenario["dist_back"],
-            scenario["dist_left"],
-            scenario["dist_right"],
-            scenario["altitude"],
+    for _ in range(remaining):
+        stype = random.choices(names, weights=weights)[0]
+        s = generate_scenario(stype)
+        a = apply_expert_rules(
+            s["dist_front"],
+            s["dist_back"],
+            s["dist_left"],
+            s["dist_right"],
+            s["dist_down"],
+            s["dist_up"],
         )
-
         data.append(
             {
-                "dist_front": scenario["dist_front"],
-                "dist_back": scenario["dist_back"],
-                "dist_left": scenario["dist_left"],
-                "dist_right": scenario["dist_right"],
-                "altitude": scenario["altitude"],
-                "action": action,
+                "dist_front": s["dist_front"],
+                "dist_back": s["dist_back"],
+                "dist_left": s["dist_left"],
+                "dist_right": s["dist_right"],
+                "dist_down": s["dist_down"],
+                "dist_up": s["dist_up"],
+                "action": a,
             }
         )
-
-        action_counts[action] += 1
-
-        if (i + 1) % 10000 == 0:
-            print(f"   Generated {len(data):,} / {num_samples:,}...")
+        action_counts[a] += 1
 
     print(f"\n✅ Generated {len(data):,} samples\n")
-    print("Final action distribution:")
-    total = sum(action_counts.values())
-    for action_id in sorted(action_counts.keys()):
-        count = action_counts[action_id]
-        pct = (count / total) * 100
-        status = "✅" if count >= 50 else "⚠️"
-        print(
-            f"   {status} {action_id} ({ACTION_MAP[action_id]:10s}): "
-            f"{count:6d} ({pct:5.1f}%)"
-        )
+    for aid in sorted(action_counts.keys()):
+        c = action_counts[aid]
+        pct = c / len(data) * 100.0
+        print(f"  {aid} ({ACTION_MAP[aid]:10s}): {c:6d} ({pct:5.1f}%)")
 
-    missing = [i for i in range(9) if action_counts[i] < 50]
-    if missing:
-        print(f"\n❌ WARNING: Low count actions: {[ACTION_MAP[i] for i in missing]}")
-    else:
-        print("\n✅ All 9 actions well represented!")
-
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
+    validate_vertical_navigation(df)
+    validate_tight_space_navigation(df)
+    return df
 
 
 def main():
-    synthetic_df = generate_synthetic_data(NUM_SAMPLES)
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = f"drone_training_data_{timestamp}.csv"
-    synthetic_df.to_csv(output_file, index=False)
-
-    print(f"\nSaved: {output_file}")
-    print(f"Total: {len(synthetic_df):,} samples")
-    print("\nNext: Rename to 'drone_training_data.csv' and run trainer")
+    df = generate_synthetic_data(NUM_SAMPLES)
+    output_file = "zigzag_drone_training_data.csv"
+    df.to_csv(output_file, index=False)
+    print(f"\n✅ Saved: {output_file}")
+    print(
+        f"   Features: dist_front, dist_back, dist_left, dist_right, dist_down, dist_up"
+    )
+    print(f"   Actions: 0-8")
 
 
 if __name__ == "__main__":
