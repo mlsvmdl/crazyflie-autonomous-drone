@@ -4,13 +4,12 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023a/projects/objects/floors/protos/Floor.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Wall.proto"
-EXTERNPROTO "../protos/Crazyflie.proto"
 
 WorldInfo {
 }
 Viewpoint {
-  orientation -0.22365656908562007 -0.27253490010249604 0.935789755944663 4.843316171827476
-  position -4.6886327054588985 2.043366827227508 0.5467571066420946
+  orientation -0.16540771166321658 0.9860270832991038 0.019770683422703588 0.5720194446913297
+  position -4.824050864987882 4.055551029836269 0.2535871619769822
   follow "Crazyflie"
   followType "Mounted Shot"
 }
@@ -19,6 +18,8 @@ TexturedBackground {
 TexturedBackgroundLight {
 }
 Floor {
+}
+Shape {
 }
 Wall {
   translation -2.59 -4.97 0.4
@@ -33,6 +34,11 @@ Wall {
   translation -2.59 -3.62 0.4
   rotation 0.577349935856137 0.5773509358560258 -0.577349935856137 -2.094395307179586
   name "wall(3)"
+}
+Wall {
+  translation -2.59 -3.62 1.42
+  rotation 0.577349935856137 0.5773509358560258 -0.577349935856137 -2.094395307179586
+  name "wall(50)"
 }
 Wall {
   translation -1.57 -3.62 0.4
@@ -50,9 +56,9 @@ Wall {
   name "wall(54)"
 }
 Wall {
-  translation -3.97 -0.43 0.4
-  rotation 1 -1.66574e-06 -7.19235e-09 -1.5708053071795867
-  name "wall(55)"
+  translation -3.97 -0.59 0.399999
+  rotation -1 1.03407e-06 2.39745e-09 1.5708
+  name "wall(49)"
 }
 Wall {
   translation -1.57 -3.62 0.4
@@ -110,44 +116,34 @@ Wall {
   name "wall(40)"
 }
 Wall {
-  translation -4.38 -0.2 0.180003
+  translation -4.96 1.17 1.44
+  rotation -1.6952594753969508e-09 0.707104781184338 -0.7071087811831002 -3.1415853071795863
+  name "wall(52)"
+}
+Wall {
+  translation -4.38 -0.15 0.620003
   rotation 0.5773502691896258 -0.5773502691896258 0.5773502691896258 2.09439
   name "wall(42)"
 }
 Wall {
-  translation -4.38 -0.2 1.11
-  rotation 0.5199877851067723 -0.5199877851067723 0.6776617199455095 1.95044
-  name "wall(51)"
-}
-Wall {
-  translation -4.38 1.92387 0.613375
-  rotation 0.5199877851067723 -0.5199877851067723 0.6776617199455095 1.95044
-  name "wall(52)"
-}
-Wall {
-  translation -4.38 2.08811 -0.434839
+  translation -4.38 2.05931 -0.0175153
   rotation 0.5199877851067723 -0.5199877851067723 0.6776617199455095 1.95044
   name "wall(43)"
 }
 Wall {
-  translation -4.38 -1.19 0.180003
+  translation -4.38 -1.19 0.610003
   rotation 0.5773502691896258 -0.5773502691896258 0.5773502691896258 2.09439
   name "wall(47)"
 }
 Wall {
-  translation -4.38 -1.19 1.44
-  rotation 0.5773502691896258 -0.5773502691896258 0.5773502691896258 2.09439
-  name "wall(50)"
-}
-Wall {
-  translation -3.93546 -3.08 0.216188
-  rotation -0.7933542749306127 1.7486206059705605e-07 -0.6087602109610083 -3.1415853071795863
+  translation -3.91292 -3.08 0.686387
+  rotation -0.86602598585025 6.52815989333827e-07 -0.49999899183066004 -3.1415853071795863
   name "wall(48)"
 }
 Wall {
-  translation -3.9654 -3.08 1.4563
-  rotation 0.7933542749306127 -1.7486206059705605e-07 0.6087602109610083 3.14159
-  name "wall(49)"
+  translation -3.65396 -3.08 2.01488
+  rotation -0.86602598585025 6.52815989333827e-07 -0.49999899183066004 -3.1415853071795863
+  name "wall(81)"
 }
 Wall {
   translation -4.96 -1.17 0.400013
@@ -155,23 +151,28 @@ Wall {
   name "wall(44)"
 }
 Wall {
-  translation 1.8 -1.28 0.4
-  rotation -0.2810849120718748 0.6785967877234219 -0.6785997877224834 2.59357
+  translation -4.96 -1.17 1.38001
+  rotation -1.6952594753969508e-09 0.707104781184338 -0.7071087811831002 -3.1415853071795863
+  name "wall(51)"
+}
+Wall {
+  translation 2.35062 -1.13243 0.4
+  rotation -0.09269171116629814 0.7040610848161706 -0.7040640848165319 2.95674
   name "wall(10)"
 }
 Wall {
-  translation 2.24544 -0.410282 0.4
-  rotation -0.2810849120718748 0.6785967877234219 -0.6785997877224834 2.59357
+  translation 1.76931 -1.26428 0.399999
+  rotation 0.5773509358554485 -0.5773489358556708 0.5773509358554485 -2.094405307179586
   name "wall(46)"
 }
 Wall {
-  translation 3.50408 -1.66891 0.4
-  rotation -0.2810849120718748 0.6785967877234219 -0.6785997877224834 2.59357
+  translation 3.39221 -2.8356 0.4
+  rotation -0.6776620723197613 0.5199860554926548 -0.5199890554929749 1.95045
   name "wall(41)"
 }
 Wall {
-  translation 1.21218 -3.6072 0.400009
-  rotation -0.6776602860184432 0.5199882194701742 -0.5199892194705962 1.95046
+  translation 0.96526 -4.41948 0.400012
+  rotation 0.7745950284760504 -0.44721501644074235 0.44721501644074235 -1.823495307179586
   name "wall(14)"
 }
 Wall {
@@ -208,6 +209,11 @@ Wall {
   translation 2.13955 2.36639 0.399992
   rotation -0.5773559358173649 -0.5773409358190325 0.5773539358175873 2.0944
   name "wall(39)"
+}
+Wall {
+  translation 3.03955 2.36639 0.399992
+  rotation -0.5773559358173649 -0.5773409358190325 0.5773539358175873 2.0944
+  name "wall(75)"
 }
 Wall {
   translation 3.66955 1.0764 0.399947
@@ -255,6 +261,114 @@ Wall {
   name "wall(31)"
 }
 Wall {
+  translation 2.96951 -0.0536409 -0.0400613
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(61)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation 3.66951 0.816359 -0.0400711
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(72)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation 1.87951 0.866372 -0.0400549
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(62)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation 0.619504 -0.093617 -0.0400407
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(63)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation -0.520496 0.916396 -0.0400328
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(64)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation -0.270494 2.0164 -0.0400387
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(55)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation -0.930499 1.3464 -0.0400293
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(77)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation 0.559506 1.5564 -0.0400457
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(73)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation 1.54951 2.0664 -0.0400561
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(74)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation 2.55951 1.4164 -0.0400629
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(76)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation 2.92951 2.5564 -0.0400709
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(78)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation -0.22047 4.1864 -0.0400488
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(65)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation -1.17467 3.74043 -0.0400395
+  rotation 7.624749999656505e-06 -5.653589999745305e-06 0.99999999995495 -1.0472053071795866
+  name "wall(66)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation -1.38251 3.62043 -0.0400371
+  rotation 7.624749999656505e-06 -5.653589999745305e-06 0.99999999995495 -1.0472053071795866
+  name "wall(71)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation -0.91047 3.7064 -0.0400411
+  rotation 0.24671294213163586 -0.5689248665544213 0.7845108159871258 -1.5307179586088182e-05
+  name "wall(69)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation -0.910467 4.5864 -0.0400437
+  rotation 0.24647096255354628 -0.5683659136478891 0.7849918807358002 -1.5307179586088182e-05
+  name "wall(67)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation -1.18099 4.55784 -0.0400399
+  rotation -1.0837999999511727e-06 -9.430239999575148e-06 -0.999999999954948 -1.0471853071795865
+  name "wall(68)"
+  size 0.2 0.5 0.9
+}
+Wall {
+  translation -1.61399 4.80784 -0.0400355
+  rotation 1.0837999999511727e-06 9.430239999575148e-06 0.999999999954948 1.04719
+  name "wall(70)"
+  size 0.2 0.5 0.9
+}
+Wall {
   translation -5.42045 4.9164 0.399993
   rotation -0.5773479358528951 0.5773529358523396 -0.5773499358526729 2.09441
   name "wall(32)"
@@ -271,7 +385,7 @@ Wall {
 }
 Wall {
   translation 1.98 -2.65 0.400005
-  rotation -0.5773489358533613 -0.5773529358529169 0.5773489358533613 2.0944
+  rotation -0.5773489358533613 -0.5773529358529169 0.5773489358533613 2.094395307179586
   name "wall(8)"
 }
 Wall {
@@ -290,8 +404,8 @@ Wall {
   name "wall(15)"
 }
 Wall {
-  translation 4.12788 -3.86717 0.4
-  rotation 0.7745965212991105 -0.44721372362178063 0.44721372362178063 -1.823475307179586
+  translation 4.09713 -5.06606 0.4
+  rotation 0.9831055672070398 0.12942894302144423 -0.12942794302188446 -1.5878353071795859
   name "wall(16)"
 }
 Wall {
@@ -324,8 +438,239 @@ Wall {
   rotation 0.577349935856137 0.5773509358560258 -0.577349935856137 -2.094395307179586
   name "wall(23)"
 }
-Crazyflie {
-  translation -4.49122 0.985054 0.015
-  rotation -3.44643e-08 -6.33077e-08 1 -1.463605307179586
+Wall {
+  translation 2.34518 4.20283 0.328364
+  rotation -1.18647e-06 1 3.37998e-07 -1.8325953071795862
+  name "wall(79)"
+  size 0.2 1.25 2.4
+}
+Wall {
+  translation 4.61113 4.17283 -0.289118
+  rotation 1.60756e-06 -1 -2.52825e-08 1.309
+  name "wall(80)"
+  size 0.2 1.25 2.4
+}
+Robot {
+  translation -4.465137147641189 4.025504995521996 0.014991660528178428
+  rotation -3.1821987096731914e-06 0.00020784283892093304 0.9999999783956138 0.03061904974119757
+  children [
+    DEF BODY Pose {
+      translation 0 0 -0.015
+      children [
+        Group {
+        }
+        CadShape {
+          url [
+            "/home/wash/work/school/neural-network/drone/crazyflie-simulation/meshes/collada_files/cf2_assembly.dae"
+          ]
+        }
+      ]
+    }
+    DEF MULTIRANGER Pose {
+      translation 0 0 -0.01
+      children [
+        DistanceSensor {
+          rotation 0 0 1 -1.57
+          name "range_right"
+          lookupTable [
+            0 0 0
+            2 2000 0
+          ]
+        }
+        DistanceSensor {
+          rotation 0.5771958946291472 0.5776588945446236 0.5771958946291472 -2.093935307179586
+          name "range_up"
+          lookupTable [
+            0 0 0
+            2 2000 0
+          ]
+        }
+        DistanceSensor {
+          rotation 0.5771968951617173 0.577656895078166 -0.5771968951617173 2.09394
+          name "range_down"
+          lookupTable [
+            0 0 0
+            2 2000 0
+          ]
+        }
+        DistanceSensor {
+          rotation 0 0 1 3.14
+          name "range_back"
+          lookupTable [
+            0 0 0
+            2 2000 0
+          ]
+        }
+        DistanceSensor {
+          rotation 0 0 1 1.57
+          name "range_left"
+          lookupTable [
+            0 0 0
+            2 2000 0
+          ]
+        }
+        DistanceSensor {
+          name "range_front"
+          lookupTable [
+            0 0 0
+            2 2000 0
+          ]
+        }
+      ]
+    }
+    Camera {
+      translation 0.03 0 0.01
+      fieldOfView 0.87
+      width 324
+      height 324
+    }
+    GPS {
+    }
+    Gyro {
+    }
+    InertialUnit {
+      name "inertial_unit"
+    }
+    DEF M1 Propeller {
+      shaftAxis 0 0 1
+      centerOfThrust 0.031 -0.031 0.008
+      thrustConstants -4e-05 0
+      torqueConstants 2.4e-06 0
+      fastHelixThreshold 50
+      device RotationalMotor {
+        name "m1_motor"
+        maxVelocity 600
+        maxTorque 30
+      }
+      fastHelix Solid {
+        translation 0.031 -0.031 0.008
+        rotation 0 0 1 4.615562457436662
+        children [
+          DEF FASTHELIX Shape {
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+              baseColorMap ImageTexture {
+                url [
+                  "/home/wash/work/school/neural-network/drone/crazyflie-simulation/meshes/textures/fast_helix.png"
+                ]
+              }
+              metalness 0
+            }
+            geometry Cylinder {
+              height 0.001
+              radius 0.025
+            }
+          }
+        ]
+      }
+      slowHelix Solid {
+        translation 0.031 -0.031 0.008
+        rotation 0 0 0.9999999999999999 2.083384795084235
+        children [
+          DEF PROP_SHAPE Shape {
+            appearance DEF PLASTIC PBRAppearance {
+              baseColor 0 0 0
+              metalness 0.3
+            }
+            geometry Mesh {
+              url [
+                "/home/wash/work/school/neural-network/drone/crazyflie-simulation/meshes/collada_files/ccw_prop.dae"
+              ]
+            }
+          }
+        ]
+      }
+    }
+    DEF M2 Propeller {
+      shaftAxis 0 0 1
+      centerOfThrust -0.031 -0.031 0.008
+      thrustConstants 4e-05 0
+      torqueConstants 2.4e-06 0
+      fastHelixThreshold 50
+      device RotationalMotor {
+        name "m2_motor"
+        maxVelocity 600
+        maxTorque 30
+      }
+      fastHelix Solid {
+        translation -0.031 -0.031 0.008
+        rotation 0 0 -0.9999999999999999 2.925962457436663
+        children [
+          USE FASTHELIX
+        ]
+      }
+      slowHelix Solid {
+        translation -0.031 -0.031 0.008
+        rotation 0 0 -1 0.4080357532183637
+        children [
+          USE PROP_SHAPE
+        ]
+      }
+    }
+    DEF M3 Propeller {
+      shaftAxis 0 0 1
+      centerOfThrust -0.031 0.031 0.008
+      thrustConstants -4e-05 0
+      torqueConstants 2.4e-06 0
+      fastHelixThreshold 50
+      device RotationalMotor {
+        name "m3_motor"
+        maxVelocity 600
+        maxTorque 30
+      }
+      fastHelix Solid {
+        translation -0.031 0.031 0.008
+        rotation 0 0 0.9999999999999999 2.925962457436663
+        children [
+          USE FASTHELIX
+        ]
+      }
+      slowHelix Solid {
+        translation -0.031 0.031 0.008
+        rotation 0 0 1 0.007266309617901989
+        children [
+          USE PROP_SHAPE
+        ]
+      }
+    }
+    DEF M4 Propeller {
+      shaftAxis 0 0 1
+      centerOfThrust 0.031 0.031 0.008
+      thrustConstants 4e-05 0
+      torqueConstants 2.4e-06 0
+      fastHelixThreshold 50
+      device RotationalMotor {
+        name "m4_motor"
+        maxVelocity 600
+        maxTorque 30
+      }
+      fastHelix Solid {
+        translation 0.031 0.031 0.008
+        rotation 0 0 -1 4.615562457436662
+        children [
+          USE FASTHELIX
+        ]
+      }
+      slowHelix DEF PROP Solid {
+        translation 0.031 0.031 0.007
+        rotation 0 0 -0.9999999999999999 2.7488667989954005
+        children [
+          USE PROP_SHAPE
+        ]
+      }
+    }
+  ]
+  name "Crazyflie"
+  model "Bitcraze's Crazyflie"
+  boundingObject Cylinder {
+    height 0.03
+    radius 0.05
+  }
+  physics Physics {
+    density -1
+    mass 0.05
+  }
   controller "crazyflie_controller_py"
+  linearVelocity 6.854450163191996e-08 2.099513145428274e-09 1.585021064569147e-05
+  angularVelocity -1.3995698651051662e-07 4.569288772127318e-06 5.950088863202402e-18
 }
